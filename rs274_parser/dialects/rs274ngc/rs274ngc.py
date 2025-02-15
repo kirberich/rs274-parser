@@ -10,6 +10,7 @@ from arpeggio.cleanpeg import ParserPEG
 from rs274_parser import exceptions, types
 from rs274_parser.math_utils import to_deg, to_rad
 from rs274_parser.types import Line, TNumber, Word
+
 from .constants import LETTERS, UNARY_OPERATORS, WORDS
 
 CURRENT_DIR = Path(__file__).parent
@@ -27,9 +28,7 @@ def word(letter: str, number: TNumber) -> Word:
     elif letter in LETTERS:
         word_info = LETTERS[letter]
     else:
-        raise RuntimeError(
-            f"FIXME: what to do when word is unknown ({letter=} {number=})"
-        )
+        raise RuntimeError(f"FIXME: what to do when word is unknown ({letter=} {number=})")
 
     return Word(letter=letter, number=number, ordering=word_info.ordering)
 
@@ -46,9 +45,7 @@ class MachineState:
         is_block_delete_switch_enabled: bool = False,
     ) -> None:
         self._pending_parameter_values = (
-            deepcopy(initial_parameter_values)
-            if initial_parameter_values is not None
-            else {}
+            deepcopy(initial_parameter_values) if initial_parameter_values is not None else {}
         )
         self.commit_parameter_values()
         self.is_block_delete_switch_enabled = is_block_delete_switch_enabled
@@ -68,9 +65,7 @@ class MachineState:
 
     def get_parameter_value(self, parameter_index: int) -> TNumber:
         if parameter_index not in self.parameter_values:
-            raise exceptions.UndefinedParameter(
-                f"Parameter #{parameter_index} is undefined."
-            )
+            raise exceptions.UndefinedParameter(f"Parameter #{parameter_index} is undefined.")
         return self.parameter_values[parameter_index]
 
     def set_parameter_value(self, parameter_index: int, parameter_value: TNumber):
@@ -108,15 +103,11 @@ class Visitor(PTNodeVisitor):
         parameter_index = children[0]
 
         if isinstance(parameter_index, float) and not parameter_index.is_integer():
-            raise exceptions.ExpectedInteger(
-                f"Expected integer for numeric parameter index, got {parameter_index}"
-            )
+            raise exceptions.ExpectedInteger(f"Expected integer for numeric parameter index, got {parameter_index}")
 
         return self.machine_state.get_parameter_value(int(parameter_index))
 
-    def visit_operand(
-        self, node, children: list[Literal["+", "-"] | TNumber]
-    ) -> TNumber:
+    def visit_operand(self, node, children: list[Literal["+", "-"] | TNumber]) -> TNumber:
         assert isinstance(children[-1], TNumber)
         if len(children) == 2 and children[0] == "-":
             return -children[-1]
@@ -130,9 +121,7 @@ class Visitor(PTNodeVisitor):
             assert isinstance(operand, TNumber)
             yield (operator, operand)
 
-    def visit_unary_operation(
-        self, node, children: list[types.UNARY_OPERATOR | TNumber]
-    ):
+    def visit_unary_operation(self, node, children: list[types.UNARY_OPERATOR | TNumber]):
         operator = children[0]
         value = children[1]
         assert isinstance(value, TNumber)
@@ -166,9 +155,7 @@ class Visitor(PTNodeVisitor):
             case "tan":
                 return math.tan(to_rad(value))
 
-    def _visit_binary_operation(
-        self, node, children: list[TNumber | types.BINARY_OPERATOR]
-    ):
+    def _visit_binary_operation(self, node, children: list[TNumber | types.BINARY_OPERATOR]):
         """Process all binary operations.
 
         Note that this is called from three separate visit_ methods because
@@ -208,9 +195,7 @@ class Visitor(PTNodeVisitor):
     visit_l2_operation = _visit_binary_operation
     visit_l3_operation = _visit_binary_operation
 
-    def visit_word_number(
-        self, node, children: list[Literal["+", "-"] | TNumber]
-    ) -> TNumber:
+    def visit_word_number(self, node, children: list[Literal["+", "-"] | TNumber]) -> TNumber:
         if children[0] == "-":
             assert isinstance(children[-1], TNumber)
             return -children[-1]
@@ -239,11 +224,7 @@ class Visitor(PTNodeVisitor):
                 return Line([], comments=[node.flat_str()])
             children = children[1:]
 
-        line_number = (
-            children[0]
-            if (len(children) > 0 and isinstance(children[0], int))
-            else None
-        )
+        line_number = children[0] if (len(children) > 0 and isinstance(children[0], int)) else None
 
         words_and_commands = cast(
             list[Word | str],
@@ -319,8 +300,4 @@ class Parser:
             parser.parse('#123 = 1 G0 X#123') # X123 evaluates to X0
             parser.parse('#123 = 1 G0 X#123') # X123 evaluates to X123
         """
-        self.machine_state = (
-            initial_machine_state.clone()
-            if initial_machine_state is not None
-            else MachineState()
-        )
+        self.machine_state = initial_machine_state.clone() if initial_machine_state is not None else MachineState()

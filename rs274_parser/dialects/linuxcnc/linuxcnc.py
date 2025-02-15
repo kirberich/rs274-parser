@@ -4,9 +4,8 @@ from pathlib import Path
 from arpeggio import visit_parse_tree
 
 from rs274_parser import exceptions
-from rs274_parser.types import Line, TNumber, Word
-
 from rs274_parser.dialects.rs274ngc import rs274ngc
+from rs274_parser.types import Line, TNumber, Word
 
 # FIXME: add missing words and letters
 word = rs274ngc.word
@@ -65,9 +64,7 @@ class MachineState(rs274ngc.MachineState):
         is_block_delete_switch_enabled: bool = False,
     ) -> None:
         self._pending_named_parameter_values = (
-            deepcopy(initial_named_parameter_values)
-            if initial_named_parameter_values is not None
-            else {}
+            deepcopy(initial_named_parameter_values) if initial_named_parameter_values is not None else {}
         )
 
         super().__init__(
@@ -95,9 +92,7 @@ class MachineState(rs274ngc.MachineState):
             return super().get_parameter_value(parameter_index)
 
         if parameter_index not in self.named_parameter_values:
-            raise exceptions.UndefinedParameter(
-                f"Named parameter #<{parameter_index}> is undefined."
-            )
+            raise exceptions.UndefinedParameter(f"Named parameter #<{parameter_index}> is undefined.")
         return self.named_parameter_values[parameter_index]
 
     def set_parameter_value(self, parameter_index: int | str, parameter_value: TNumber):

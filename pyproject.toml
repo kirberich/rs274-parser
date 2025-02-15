@@ -31,3 +31,11 @@ addopts = "--cov --cov-report=html --cov-report=term"
 omit = [
   "tests/*",
 ]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# Disable fix for unused imports (`F401`).
+select = ['I']
+unfixable = ["F401"]
