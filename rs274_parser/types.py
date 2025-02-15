@@ -66,3 +66,13 @@ class Line:
     words: list[Word]
     comments: list[str] = field(default_factory=list)
     line_number: int | None = None
+
+    def __str__(self):
+        s = ""
+
+        if self.line_number is not None:
+            s += f"N{self.line_number}"
+
+        s += " ".join([str(word) for word in self.words] + [f"({comment})" for comment in self.comments])
+
+        return s
