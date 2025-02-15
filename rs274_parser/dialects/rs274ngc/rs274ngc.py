@@ -259,10 +259,16 @@ class Visitor(PTNodeVisitor):
 class Parser:
     GRAMMAR_FILE = CURRENT_DIR / "rs274ngc.peg"
     machine_state: MachineState
+    _parser: ParserPEG | None = None
 
     def parser(self, root_rule: str):
+        if self._parser is not None:
+            return self._parser
+
         with open(self.GRAMMAR_FILE) as f:
-            return ParserPEG(f.read(), root_rule, ignore_case=True)
+            self._parser = ParserPEG(f.read(), root_rule, ignore_case=True)
+
+        return self._parser
 
     def visitor(self) -> Visitor:
         return Visitor(machine_state=self.machine_state)
