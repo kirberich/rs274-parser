@@ -264,6 +264,9 @@ class Parser:
         with open(self.GRAMMAR_FILE) as f:
             return ParserPEG(f.read(), root_rule, ignore_case=True)
 
+    def visitor(self) -> Visitor:
+        return Visitor(machine_state=self.machine_state)
+
     def _parse_rule(self, content: str, *, root_rule: str):
         """Parse a specific part of the GCode grammar, starting at the given root rule.
 
@@ -271,7 +274,7 @@ class Parser:
         """
         return visit_parse_tree(
             self.parser(root_rule).parse(content),
-            Visitor(machine_state=self.machine_state),
+            self.visitor(),
         )
 
     def parse(self, content: str) -> list[Line]:
@@ -282,7 +285,11 @@ class Parser:
         The line objects contain all comments and GCode words in the correct execution order.
         To parse just specific parts of the GCode grammar, pass in a rule name (see rs274ngc.peg) other than 'line'
         """
-        return self._parse_rule(content, root_rule="line")
+        lines = []
+
+        for line in content.splitlines():
+            lines.append(self._parse_rule(line, root_rule="line"))
+        return lines
 
     def __init__(self, initial_machine_state: MachineState | None = None):
         """Create a new parser.

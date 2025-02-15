@@ -142,15 +142,8 @@ class Parser(rs274ngc.Parser):
     GRAMMAR_FILE = CURRENT_DIR / "linuxcnc.peg"
     machine_state: MachineState  # type: ignore[reportIncompatibleVariableOverride]
 
-    def _parse_rule(self, content: str, *, root_rule: str):
-        """Parse a specific part of the GCode grammar, starting at the given root rule.
-
-        This will return whatever type the visitor returns for that given rule.
-        """
-        return visit_parse_tree(
-            self.parser(root_rule).parse(content),
-            Visitor(machine_state=self.machine_state),
-        )
+    def visitor(self) -> Visitor:
+        return Visitor(machine_state=self.machine_state)
 
     def __init__(self, initial_machine_state: MachineState | None = None):
         """Create a new LinuxCNC GCode parser.

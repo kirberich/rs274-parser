@@ -80,13 +80,15 @@ def test_program():
     initial_machine_state = MachineState(initial_named_parameter_values={"defined": 10})
     parser = Parser(initial_machine_state)
 
-    lines = [
-        "#<first> = 1 #123 = 1 G0 X#<defined> G53",  # set G53, G0 X10, assign variables
-        "N10 #123 = 2 G#<first> X#123 ; a comment",  # G1 X1
-        "; another comment",
-    ]
+    lines = "\n".join(
+        [
+            "#<first> = 1 #123 = 1 G0 X#<defined> G53",  # set G53, G0 X10, assign variables
+            "N10 #123 = 2 G#<first> X#123 ; a comment",  # G1 X1
+            "; another comment",
+        ]
+    )
 
-    processed_lines = [parser.parse(line) for line in lines]
+    processed_lines = parser.parse(lines)
 
     assert processed_lines == [
         Line([word("g", 53), word("g", 0), word("X", 10)]),
