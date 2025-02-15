@@ -1,4 +1,4 @@
-from .rs274ngc import LETTERS, WORDS, MachineState, Parser, word
+from .rs274ngc import LETTERS, WORDS, MachineState, Parser, Visitor, word
 
 __all__ = [
     "LETTERS",
@@ -6,4 +6,5 @@ __all__ = [
     "Parser",
     "word",
     "WORDS",
+    "Visitor",
 ]

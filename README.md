@@ -73,8 +73,5 @@ class Word:
     * Missing two-parameter ATAN
     * Missing machine parameters that are defined by default
 * LinuxCNC see [difference to RS274/NGC](http://linuxcnc.org/docs/stable/html/gcode/rs274ngc.html)
-    * Still very much work-in-progress
     * Missing oWords
-    * Missing a bunch of words extending RS274
-    * Wrongly allows G84 and G87, which are not implemented by LinuxCNC
     * Missing numeric and named global parameters that are defined by default

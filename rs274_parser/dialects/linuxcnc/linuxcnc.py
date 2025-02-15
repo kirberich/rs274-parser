@@ -1,55 +1,18 @@
 from copy import deepcopy
 from pathlib import Path
 
-from arpeggio import visit_parse_tree
-
 from rs274_parser import exceptions
-from rs274_parser.dialects.rs274ngc import rs274ngc
+from rs274_parser.dialects import rs274ngc
 from rs274_parser.types import Line, TNumber, Word
 
-# FIXME: add missing words and letters
 word = rs274ngc.word
-WORDS = rs274ngc.WORDS
-LETTERS = rs274ngc.LETTERS
+
+from . import constants
+
+LETTERS = constants.LETTERS
+WORDS = constants.WORDS
 
 CURRENT_DIR = Path(__file__).parent
-
-
-#     G(17.1, name="Select UV plane", modal_group=2, ordering=11),
-#     G(17.1, name="Select UV plane", modal_group=2, ordering=11),
-#     G(17.1, name="Select UV plane", modal_group=2, ordering=11),
-
-#     G(
-#         38.3,
-#         name="Straight probe (towards piece without alarm)",
-#         modal_group=1,
-#         ordering=21,
-#     ),
-#     G(
-#         38.4,
-#         name="Straight probe (away from piece with alarm)",
-#         modal_group=1,
-#         ordering=21,
-#     ),
-#     G(
-#         38.5,
-#         name="Straight probe (away from piece without alarm)",
-#         modal_group=1,
-#         ordering=21,
-#     ),
-
-# G41.1
-# G42.1
-# G43.2
-
-# m50
-# m51
-# m52
-# m53
-
-# m61
-
-# G(95, name="Units per revolution mode", modal_group=5, ordering=2),
 
 
 class MachineState(rs274ngc.MachineState):
