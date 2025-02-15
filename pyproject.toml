@@ -1,0 +1,33 @@
+[project]
+name = "rs274-parser"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Robert Kirberich",email = "robert@kirberich.de"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "arpeggio (>=2.0.2,<3.0.0)",
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+pytest-coverage = "^0.0"
+ruff = "^0.9.6"
+
+[tool.pyright]
+reportMatchNotExhaustive = true
+
+[tool.pytest.ini_options]
+addopts = "--cov --cov-report=html --cov-report=term"
+
+[tool.coverage.report]
+# Regexes for lines to exclude from consideration
+omit = [
+  "tests/*",
+]

@@ -1,0 +1,35 @@
+// RS274NGC as per https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=823374
+// (Or as close as I can get it)
+
+unary_operator = "abs" / "acos" / "asin" / "atan" / "cos" / "exp" / "fix" / "fup" / "ln" / "round" / "sin" / "sqrt" / "tan" 
+l1_operator = "+" / "-" / "and" / "or" / "xor"
+l2_operator = "*" / "/"
+// Silly choice between two same tokens here to force the parser to actually return the token (there must be a better way)
+l3_operator = "**" / "**"
+
+comment = "(" r"[^\)]*" ")"
+
+// Silly choice between two same tokens here to force the parser to actually return the token (there must be a better way)
+block_delete_character = "/" / "/" 
+line = block_delete_character? line_number? (word / parameter_setting / comment)* EOF
+parameter_setting = "#" integer "=" real_value
+line_number = "N" integer
+word = r'[a-z]' word_number
+
+// An expression that evaluates to a number 
+real_value = (expression / numeric_parameter / unary_operation / number)
+
+word_number = ("+" / "-")? real_value
+
+numeric_parameter = "#" (number / expression)
+expression = "[" l1_operation "]"
+
+unary_operation = unary_operator expression 
+l1_operation = l2_operation (l1_operator l2_operation)*
+l2_operation = l3_operation (l2_operator l3_operation)*
+l3_operation = operand (l3_operator operand)*
+operand = ("+" / "-")? real_value
+
+number = float / integer 
+integer = r'-?[\d \t]+'
+float = r'-?[\d \t]*\.[\d \t]+'

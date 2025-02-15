@@ -1,0 +1,41 @@
+// LinuxCNC dialect of RS274/NGC, see http://linuxcnc.org/docs/stable/html/gcode/rs274ngc.html
+// The linked documented does not mention semicolon comments, but this grammar includes them.
+
+unary_operator = "abs" / "acos" / "asin" / "atan" / "cos" / "exp" / "fix" / "fup" / "ln" / "round" / "sin" / "sqrt" / "tan" 
+l1_operator = "+" / "-" / "and" / "or" / "xor"
+l2_operator = "*" / "/"
+// Silly choice between two same tokens here to force the parser to actually return the token (there muste be a better way)
+l3_operator = "**" / "**"
+
+comment = "(" r"[^)]*" ")"
+semicolon_comment = ";" r".*" EOF
+
+// Silly choice between two same tokens here to force the parser to actually return the token (there muste be a better way)
+block_delete_character = "/" / "/" 
+line = block_delete_character? line_number? (word / parameter_setting / named_parameter_setting / comment / semicolon_comment)* EOF
+parameter_setting = "#" integer "=" real_value
+named_parameter_setting = "#<" r"[^()>]+" ">" "=" real_value
+line_number = "N" integer
+word = r'[a-z]' word_number
+
+// An expression that evaluates to a number 
+real_value = (expression / parameter_value / unary_operation / number)
+
+word_number = ("+" / "-")? real_value
+
+// Named parameters are the main difference to the base rs274 spec
+parameter_value = numeric_parameter / named_parameter 
+numeric_parameter = "#" (number / expression)
+named_parameter = "#<" r"[^>]+" ">"
+
+expression = "[" l1_operation "]"
+
+unary_operation = unary_operator expression 
+l1_operation = l2_operation (l1_operator l2_operation)*
+l2_operation = l3_operation (l2_operator l3_operation)*
+l3_operation = operand (l3_operator operand)*
+operand = ("+" / "-")? real_value
+
+number = float / integer 
+integer = r'-?[\d \t]+'
+float = r'-?[\d \t]*\.[\d \t]+'
