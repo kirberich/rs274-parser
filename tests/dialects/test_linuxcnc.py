@@ -2,7 +2,7 @@ import pytest
 from arpeggio import NoMatch
 
 from rs274_parser import exceptions
-from rs274_parser.dialects.linuxcnc.linuxcnc import MachineState, Parser, word
+from rs274_parser.dialects.linuxcnc import MachineState, Parser, word
 from rs274_parser.types import Line, TNumber
 
 

@@ -4,7 +4,7 @@ import pytest
 from arpeggio import NoMatch
 
 from rs274_parser import exceptions
-from rs274_parser.dialects.rs274ngc.rs274ngc import MachineState, Parser, word
+from rs274_parser.dialects.rs274ngc import MachineState, Parser, word
 from rs274_parser.types import Line, TNumber, Word
 
 

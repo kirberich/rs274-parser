@@ -48,15 +48,9 @@ LETTERS = {
     "D": WordInfo(name="Tool compensation radius", modal_group=0, ordering=99),
     "H": WordInfo(name="Tool length offset index", modal_group=0, ordering=99),
     # Arcs
-    "I": WordInfo(
-        name="X-axis offset for arcs or G87 canned cycles", modal_group=0, ordering=99
-    ),
-    "J": WordInfo(
-        name="Y-axis offset for arcs or G87 canned cycles", modal_group=0, ordering=99
-    ),
-    "K": WordInfo(
-        name="Z-axis offset for arcs or G87 canned cycles", modal_group=0, ordering=99
-    ),
+    "I": WordInfo(name="X-axis offset for arcs or G87 canned cycles", modal_group=0, ordering=99),
+    "J": WordInfo(name="Y-axis offset for arcs or G87 canned cycles", modal_group=0, ordering=99),
+    "K": WordInfo(name="Z-axis offset for arcs or G87 canned cycles", modal_group=0, ordering=99),
     # Misc/general
     "G": WordInfo(name="General function", modal_group=0, ordering=99),
     "L": WordInfo(
@@ -70,9 +64,7 @@ LETTERS = {
         modal_group=0,
         ordering=99,
     ),
-    "Q": WordInfo(
-        name="Feed increment in G83 canned cycle", modal_group=0, ordering=99
-    ),
+    "Q": WordInfo(name="Feed increment in G83 canned cycle", modal_group=0, ordering=99),
     "R": WordInfo(name="Arc radius, canned cycle plane", modal_group=0, ordering=99),
 }
 
@@ -80,9 +72,7 @@ LETTERS = {
 WORDS = {
     # Non-modal
     "G4": WordInfo(name="dwell", modal_group=0, ordering=10),
-    "G10": WordInfo(
-        name="Cordinate system or tool table data", modal_group=0, ordering=19
-    ),
+    "G10": WordInfo(name="Cordinate system or tool table data", modal_group=0, ordering=19),
     "G28": WordInfo(name="Go/set predefined Position", modal_group=0, ordering=19),
     "G30": WordInfo(name="Go/set predefined Position", modal_group=0, ordering=19),
     "G53": WordInfo(name="Move in machine moordinates", modal_group=0, ordering=20),
@@ -95,9 +85,7 @@ WORDS = {
     "G1": WordInfo(name="Linear move", modal_group=1, ordering=21),
     "G2": WordInfo(name="Clockwise arc", modal_group=1, ordering=21),
     "G3": WordInfo(name="Counterclockwise arc", modal_group=1, ordering=21),
-    "G38.2": WordInfo(
-        name="Straight probe (towards piece with alarm)", modal_group=1, ordering=21
-    ),
+    "G38.2": WordInfo(name="Straight probe (towards piece with alarm)", modal_group=1, ordering=21),
     "G80": WordInfo(name="Cancel canned cycle", modal_group=1, ordering=21),
     "G81": WordInfo(name="Drilling cycle", modal_group=1, ordering=21),
     "G82": WordInfo(name="Drilling cycle, dwell", modal_group=1, ordering=21),
@@ -123,12 +111,8 @@ WORDS = {
     "G21": WordInfo(name="Use mm", modal_group=6, ordering=12),
     # GCode modal group 7
     "G40": WordInfo(name="Cutter radius compensation off", modal_group=7, ordering=13),
-    "G41": WordInfo(
-        name="Cutter compensation left of path", modal_group=7, ordering=13
-    ),
-    "G42": WordInfo(
-        name="Cutter compensation right of path", modal_group=7, ordering=13
-    ),
+    "G41": WordInfo(name="Cutter compensation left of path", modal_group=7, ordering=13),
+    "G42": WordInfo(name="Cutter compensation right of path", modal_group=7, ordering=13),
     # GCode modal group 8
     "G43": WordInfo(name="Tool length offset", modal_group=8, ordering=14),
     "G49": WordInfo(name="Cancel tool length compensation", modal_group=8, ordering=14),
@@ -152,12 +136,8 @@ WORDS = {
     # MCode modal group 4
     "M0": WordInfo(name="Pause", modal_group=4, ordering=22),
     "M1": WordInfo(name="Optional stop", modal_group=4, ordering=22),
-    # FIXME: side effects
     "M2": WordInfo(name="Program end", modal_group=4, ordering=22),
-    # FIXME: side effects
-    "M30": WordInfo(
-        name="Program end, exchange pallet shuttles", modal_group=4, ordering=22
-    ),
+    "M30": WordInfo(name="Program end, exchange pallet shuttles", modal_group=4, ordering=22),
     # MCode modal group 6
     "M6": WordInfo(name="Change tool", modal_group=6, ordering=6),
     # MCode modal group 7
