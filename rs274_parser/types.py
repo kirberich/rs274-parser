@@ -1,5 +1,6 @@
 """Types used in the GCode grammars"""
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -60,12 +61,23 @@ class Word:
     def __str__(self):
         return f"{self.letter.upper()}{self.number}"
 
+    def matches(self, letter: str, numbers: set[TNumber]):
+        if self.letter == letter and self.number in numbers:
+            return True
+        return False
 
-@dataclass(slots=True, frozen=True)
+
+@dataclass(slots=True)
 class Line:
     words: list[Word]
     comments: list[str] = field(default_factory=list)
     line_number: int | None = None
+    _word_dict: dict[str, dict[TNumber, Word]] = field(init=False)
+
+    def __post_init__(self):
+        self._word_dict = defaultdict(dict)
+        for word in self.words:
+            self._word_dict[word.letter][word.number] = word
 
     def __str__(self):
         s = ""
@@ -76,3 +88,16 @@ class Line:
         s += " ".join([str(word) for word in self.words] + [f"({comment})" for comment in self.comments])
 
         return s
+
+    def first(self, letter: str, numbers: set[TNumber] | None = None) -> Word | None:
+        if numbers is None:
+            try:
+                return next(iter(self._word_dict[letter].values()))
+            except StopIteration:
+                return None
+
+        for number in numbers:
+            if number in self._word_dict[letter]:
+                return self._word_dict[letter][number]
+
+        return None
