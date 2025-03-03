@@ -1,28 +1,28 @@
 import pytest
-from arpeggio import NoMatch
+from pe._errors import ParseError
 
 from rs274_parser import exceptions
-from rs274_parser.dialects.linuxcnc import MachineState, Parser, word
+from rs274_parser.dialects.linuxcnc import LinuxCNC, MachineState, word
 from rs274_parser.types import Line, TNumber
 
 
 def test_named_parameters():
     machine_state = MachineState(initial_named_parameter_values={"defined": 123})
-    assert Parser(machine_state)._parse_rule("#<defined>", root_rule="named_parameter") == 123
+    assert LinuxCNC(machine_state, start_rule="named_parameter")._parse_rule("#<defined>") == 123
 
 
 @pytest.mark.parametrize(
     "input,expected_exception",
     [
         ("#<undefined>", exceptions.UndefinedParameter),
-        ("#banana", NoMatch),
+        ("#banana", ParseError),
     ],
 )
 def test_named_parameters__error(input: str, expected_exception: type[Exception]):
     machine_state = MachineState(initial_named_parameter_values={"defined": 123})
 
     with pytest.raises(expected_exception):
-        Parser(machine_state)._parse_rule(input, root_rule="named_parameter")
+        LinuxCNC(machine_state, start_rule="named_parameter")._parse_rule(input)
 
 
 @pytest.mark.parametrize(
@@ -50,7 +50,7 @@ def test_named_parameters__error(input: str, expected_exception: type[Exception]
         (
             # Set a named parameter
             "#<param> = #<defined> G0 X#<param>",
-            Line([word("g", 0), word("x", 1)]),
+            Line(words=[word("g", 0), word("x", 1)], named_assignments={"param": 10}),
             {"defined": 10, "param": 10},
         ),
     ],
@@ -61,9 +61,9 @@ def test_line(
     expected_named_parameters: dict[str, TNumber] | None,
 ):
     initial_machine_state = MachineState(initial_named_parameter_values={"defined": 10, "param": 1})
-    parser = Parser(initial_machine_state)
+    parser = LinuxCNC(initial_machine_state, start_rule="line")
 
-    assert pytest.approx(expected_output) == parser._parse_rule(input, root_rule="line")
+    assert pytest.approx(expected_output) == parser._parse_rule(input)
 
     if expected_named_parameters is not None:
         # The initial state should not change
@@ -78,7 +78,7 @@ def test_line(
 def test_program():
     """A small integration test trying to use the various language features together."""
     initial_machine_state = MachineState(initial_named_parameter_values={"defined": 10})
-    parser = Parser(initial_machine_state)
+    parser = LinuxCNC(initial_machine_state)
 
     lines = "\n".join(
         [
@@ -91,8 +91,12 @@ def test_program():
     processed_lines = parser.parse(lines)
 
     assert processed_lines == [
-        Line([word("g", 53), word("g", 0), word("X", 10)]),
-        Line([word("g", 1), word("x", 1)], line_number=10, comments=["a comment"]),
+        Line(
+            words=[word("g", 53), word("g", 0), word("X", 10)],
+            named_assignments={"first": 1},
+            numeric_assignments={123: 1},
+        ),
+        Line(words=[word("g", 1), word("x", 1)], line_number=10, comments=["a comment"], numeric_assignments={123: 2}),
         Line([], comments=["another comment"]),
     ]
 

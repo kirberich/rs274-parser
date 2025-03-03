@@ -30,6 +30,18 @@ UNARY_OPERATOR = Literal[
 TNumber = int | float
 
 
+@dataclass(kw_only=True, slots=True)
+class NumericParameterAssignment:
+    index: int
+    value: TNumber
+
+
+@dataclass(kw_only=True, slots=True)
+class NamedParameterAssignment:
+    name: str
+    value: TNumber
+
+
 @dataclass(slots=True, frozen=True)
 class WordInfo:
     """Meta information about a word."""
@@ -52,7 +64,7 @@ class Word:
 
     letter: str
     number: TNumber
-    ordering: int = field(kw_only=True)
+    ordering: int = field(kw_only=True, repr=False)
 
     def __lt__(self, other: "Word"):
         """Make words sortable by their position in the order of execution"""
@@ -60,6 +72,8 @@ class Word:
 
     def __str__(self):
         return f"{self.letter.upper()}{self.number}"
+
+    __repr__ = __str__
 
     def matches(self, letter: str, numbers: set[TNumber]):
         if self.letter == letter and self.number in numbers:
@@ -71,8 +85,10 @@ class Word:
 class Line:
     words: list[Word]
     comments: list[str] = field(default_factory=list)
+    numeric_assignments: dict[int, TNumber] = field(default_factory=dict, repr=False)
+    named_assignments: dict[str, TNumber] = field(default_factory=dict, repr=False)
     line_number: int | None = None
-    _word_dict: dict[str, dict[TNumber, Word]] = field(init=False)
+    _word_dict: dict[str, dict[TNumber, Word]] = field(init=False, repr=False)
 
     def __post_init__(self):
         self._word_dict = defaultdict(dict)

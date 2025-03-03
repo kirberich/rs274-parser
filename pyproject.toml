@@ -8,7 +8,7 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "arpeggio (>=2.0.2,<3.0.0)",
+    "pe (>=0.5.3,<0.6.0)",
 ]
 
 [build-system]

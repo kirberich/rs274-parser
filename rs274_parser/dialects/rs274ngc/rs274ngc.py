@@ -1,17 +1,26 @@
+import datetime
 import math
+import re
 from copy import deepcopy
 from itertools import batched
 from pathlib import Path
-from typing import Iterable, Literal, cast
+from typing import Any, Callable, Iterable, Literal, Sequence, cast
 
-from arpeggio import NonTerminal, PTNodeVisitor, Terminal, visit_parse_tree
-from arpeggio.cleanpeg import ParserPEG
+import pe
+from pe._constants import Flag
+from pe._grammar import Grammar
+from pe._parse import loads
+from pe.actions import Action, Capture, Pack
+from pe.machine import MachineParser
+from pe.packrat import PackratParser
+from pe.patterns import DEFAULT_IGNORE
 
 from rs274_parser import exceptions, types
 from rs274_parser.math_utils import to_deg, to_rad
-from rs274_parser.types import Line, TNumber, Word
+from rs274_parser.types import BINARY_OPERATOR, UNARY_OPERATOR, Line, NumericParameterAssignment, TNumber, Word
 
 from .constants import LETTERS, UNARY_OPERATORS, WORDS
+from .rs274ngc_grammar import GRAMMAR
 
 CURRENT_DIR = Path(__file__).parent
 
@@ -76,54 +85,37 @@ class MachineState:
         self._pending_parameter_values[parameter_index] = parameter_value
 
 
-class Visitor(PTNodeVisitor):
+class LineAction(Action):
+    func: Callable[[str, Sequence[Any]], Line]
+
+    def __init__(self, func):
+        self.func = func
+
+    def __call__(self, s: str, pos: int, end: int, args: Sequence, kwargs: dict | None) -> tuple[tuple[Line], None]:
+        return ((self.func(s, args),), None)
+
+
+class Rs274:
+    start_rule: str
+    extra_rule: str | None
     machine_state: MachineState
+    _parser: pe.Parser | None = None
 
-    def __init__(
-        self,
-        machine_state: MachineState,
-        defaults=True,
-        **kwargs,
-    ):
-        super().__init__(defaults, **kwargs)
-        self.machine_state = machine_state
+    def transform_float(self, s: str):
+        return float("".join(s.split()))
 
-    def visit_integer(self, node: Terminal, children) -> int:
-        value = node.value
-        assert isinstance(value, str)
-        return int("".join(value.split()))
+    def transform_integer(self, s: str):
+        return int("".join(s.split()))
 
-    def visit_float(self, node: Terminal, children) -> float:
-        value = node.value
-        assert isinstance(value, str)
-        return float("".join(value.split()))
+    def transform_operand(self, items: list[Literal["+", "-"] | TNumber]) -> TNumber:
+        assert isinstance(items[-1], TNumber)
+        if items[0] == "-":
+            return -items[-1]
+        return items[-1]
 
-    def visit_numeric_parameter(self, node, children: list[TNumber]):
-        assert len(children) == 1
-        parameter_index = children[0]
-
-        if isinstance(parameter_index, float) and not parameter_index.is_integer():
-            raise exceptions.ExpectedInteger(f"Expected integer for numeric parameter index, got {parameter_index}")
-
-        return self.machine_state.get_parameter_value(int(parameter_index))
-
-    def visit_operand(self, node, children: list[Literal["+", "-"] | TNumber]) -> TNumber:
-        assert isinstance(children[-1], TNumber)
-        if len(children) == 2 and children[0] == "-":
-            return -children[-1]
-        return children[-1]
-
-    def _chunk_binary_op_children(
-        self, children: list[TNumber | types.BINARY_OPERATOR]
-    ) -> Iterable[tuple[types.BINARY_OPERATOR, TNumber]]:
-        for operator, operand in batched(children, 2):
-            assert isinstance(operator, str)
-            assert isinstance(operand, TNumber)
-            yield (operator, operand)
-
-    def visit_unary_operation(self, node, children: list[types.UNARY_OPERATOR | TNumber]):
-        operator = children[0]
-        value = children[1]
+    def transform_unary_operation(self, items: list[UNARY_OPERATOR | TNumber]):
+        operator = str(items[0]).lower()
+        value = items[1]
         assert isinstance(value, TNumber)
         assert operator in UNARY_OPERATORS
 
@@ -155,17 +147,38 @@ class Visitor(PTNodeVisitor):
             case "tan":
                 return math.tan(to_rad(value))
 
-    def _visit_binary_operation(self, node, children: list[TNumber | types.BINARY_OPERATOR]):
+    def chunk_binary_op_items(
+        self,
+        items: list[TNumber | BINARY_OPERATOR],
+    ) -> Iterable[tuple[BINARY_OPERATOR, TNumber]]:
+        for operator, operand in batched(items, 2):
+            assert isinstance(operator, str)
+            assert isinstance(operand, TNumber)
+            yield (operator, operand)
+
+    def transform_numeric_parameter(self, parameter_index: int):
+        return self.machine_state.get_parameter_value(int(parameter_index))
+
+    def transform_parameter_setting(self, items: list[TNumber]):
+        assert len(items) == 2
+        parameter_index = items[0]
+        parameter_value = items[1]
+        assert isinstance(parameter_index, int)
+
+        self.machine_state.set_parameter_value(parameter_index, parameter_value)
+        return NumericParameterAssignment(index=parameter_index, value=parameter_value)
+
+    def transform_binary_operation(self, items: list[TNumber | BINARY_OPERATOR]):
         """Process all binary operations.
 
         Note that this is called from three separate visit_ methods because
         the three different levels of operator precedence require separate rules
         """
-        assert len(children) > 0
-        assert isinstance(children[0], TNumber)
-        value = children[0]
+        assert len(items) > 0
+        assert isinstance(items[0], TNumber)
+        value = items[0]
 
-        for operator, operand in self._chunk_binary_op_children(children[1:]):
+        for operator, operand in self.chunk_binary_op_items(items[1:]):
             match operator:
                 # L1
                 case "+":
@@ -191,52 +204,46 @@ class Visitor(PTNodeVisitor):
 
         return value
 
-    visit_l1_operation = _visit_binary_operation
-    visit_l2_operation = _visit_binary_operation
-    visit_l3_operation = _visit_binary_operation
+    def transform_word_number(self, items: list[Literal["+", "-"] | TNumber]) -> TNumber:
+        if items[0] == "-":
+            assert isinstance(items[-1], TNumber)
+            return -items[-1]
 
-    def visit_word_number(self, node, children: list[Literal["+", "-"] | TNumber]) -> TNumber:
-        if children[0] == "-":
-            assert isinstance(children[-1], TNumber)
-            return -children[-1]
+        assert isinstance(items[1], TNumber)
+        return items[1]
 
-        assert isinstance(children[0], TNumber)
-        return children[0]
-
-    def visit_word(self, node: NonTerminal, children: list[str | TNumber]) -> Word:
-        letter = children[0]
-        number = children[1]
+    def transform_word(self, items: list[str | TNumber]):
+        letter = items[0]
+        number = items[1]
         assert isinstance(letter, str)
         assert isinstance(number, TNumber)
 
         return word(letter, number)
 
-    def visit_parameter_setting(self, node, children: list[TNumber]):
-        parameter_index = children[0]
-        parameter_value = children[1]
-        assert isinstance(parameter_index, int)
-
-        self.machine_state.set_parameter_value(parameter_index, parameter_value)
-
-    def visit_line(self, node, children: list[Literal["/"] | int | Word | str]) -> Line:
-        if len(children) > 0 and children[0] == "/":
+    def transform_line(self, s: str, items: list[Literal["/"] | int | Word | str | NumericParameterAssignment]) -> Line:
+        if len(items) > 0 and items[0] == "/":
             if self.machine_state.is_block_delete_switch_enabled:
-                return Line([], comments=[node.flat_str()])
-            children = children[1:]
+                return Line([], comments=[s])
+            items = items[1:]
 
-        line_number = children[0] if (len(children) > 0 and isinstance(children[0], int)) else None
+        line_number = items[0] if (len(items) > 0 and isinstance(items[0], int)) else None
 
-        words_and_commands = cast(
-            list[Word | str],
-            children[1:] if line_number is not None else children,
+        statements = cast(
+            list[Word | str | NumericParameterAssignment],
+            items[1:] if line_number is not None else items,
         )
         words: list[Word] = []
         comments: list[str] = []
-        for word_or_comment in words_and_commands:
-            if isinstance(word_or_comment, Word):
-                words.append(word_or_comment)
+        numeric_assignments: dict[int, TNumber] = {}
+        for statement in statements:
+            if isinstance(statement, Word):
+                words.append(statement)
+            elif isinstance(statement, NumericParameterAssignment):
+                # Transform any numeric parameter assignments - note that later assignments in the same line
+                # overwrite previous ones
+                numeric_assignments[statement.index] = statement.value
             else:
-                comments.append(word_or_comment)
+                comments.append(statement)
 
         # Everything has been processed, it's now safe to updated the saved parameter values
         self.machine_state.commit_parameter_values()
@@ -253,35 +260,21 @@ class Visitor(PTNodeVisitor):
         # The current motion mode is set to feed (like G1).
         # Coolant is turned off (like M9).
 
-        return Line(line_number=line_number, words=sorted(words), comments=comments)
+        return Line(
+            line_number=line_number,
+            words=sorted(words),
+            comments=comments,
+            numeric_assignments=numeric_assignments,
+        )
 
-
-class Parser:
-    GRAMMAR_FILE = CURRENT_DIR / "rs274ngc.peg"
-    machine_state: MachineState
-    _parser: ParserPEG | None = None
-
-    def parser(self, root_rule: str):
-        if self._parser is not None:
-            return self._parser
-
-        with open(self.GRAMMAR_FILE) as f:
-            self._parser = ParserPEG(f.read(), root_rule, ignore_case=True)
-
-        return self._parser
-
-    def visitor(self) -> Visitor:
-        return Visitor(machine_state=self.machine_state)
-
-    def _parse_rule(self, content: str, *, root_rule: str):
+    def _parse_rule(self, content: str):
         """Parse a specific part of the GCode grammar, starting at the given root rule.
 
         This will return whatever type the visitor returns for that given rule.
         """
-        return visit_parse_tree(
-            self.parser(root_rule).parse(content),
-            self.visitor(),
-        )
+        match = self.parser.match(content, flags=Flag.STRICT)
+        assert match
+        return match.value()
 
     def parse(self, content: str) -> list[Line]:
         """Parse raw GCode from a string into a list of Line objects.
@@ -294,10 +287,34 @@ class Parser:
         lines = []
 
         for line in content.splitlines():
-            lines.append(self._parse_rule(line, root_rule="line"))
+            lines.append(self._parse_rule(line))
         return lines
 
-    def __init__(self, initial_machine_state: MachineState | None = None):
+    @property
+    def grammar_str(self) -> str:
+        return GRAMMAR
+
+    @property
+    def parser(self):
+        if self._parser is not None:
+            return self._parser
+
+        grammar_str = self.grammar_str
+        if self.extra_rule:
+            grammar_str = self.extra_rule + "\n" + grammar_str
+
+        _, defmap = loads(grammar_str)
+        g = Grammar(defmap, actions=self.actions(), start=self.start_rule)
+        self._parser = MachineParser(g, ignore=DEFAULT_IGNORE, flags=Flag.OPTIMIZE)
+
+        return self._parser
+
+    def __init__(
+        self,
+        initial_machine_state: MachineState | None = None,
+        start_rule: str = "line",
+        extra_rule: str | None = None,
+    ):
         """Create a new parser.
 
         The parser is stateful and keeps an internal machine state which gets updated as lines of gcode are parsed.
@@ -313,4 +330,22 @@ class Parser:
             parser.parse('#123 = 1 G0 X#123') # X123 evaluates to X0
             parser.parse('#123 = 1 G0 X#123') # X123 evaluates to X123
         """
+        self.start_rule = start_rule
+        self.extra_rule = extra_rule
         self.machine_state = initial_machine_state.clone() if initial_machine_state is not None else MachineState()
+
+    def actions(self):
+        return {
+            "float": Capture(self.transform_float),  # type: ignore
+            "integer": Capture(self.transform_integer),  # type: ignore
+            "word_number": Pack(self.transform_word_number),
+            "word": Pack(self.transform_word),
+            "operand": Pack(self.transform_operand),
+            "unary_operation": Pack(self.transform_unary_operation),
+            "l1_operation": Pack(self.transform_binary_operation),
+            "l2_operation": Pack(self.transform_binary_operation),
+            "l3_operation": Pack(self.transform_binary_operation),
+            "numeric_parameter": self.transform_numeric_parameter,
+            "parameter_setting": Pack(self.transform_parameter_setting),
+            "line": LineAction(self.transform_line),
+        }

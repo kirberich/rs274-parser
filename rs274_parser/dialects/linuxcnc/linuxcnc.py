@@ -1,9 +1,14 @@
 from copy import deepcopy
 from pathlib import Path
+from typing import Literal
+
+from pe.actions import Pack
 
 from rs274_parser import exceptions
 from rs274_parser.dialects import rs274ngc
-from rs274_parser.types import Line, TNumber, Word
+from rs274_parser.types import Line, NamedParameterAssignment, NumericParameterAssignment, TNumber, Word
+
+from .linuxcnc_grammar import GRAMMAR
 
 word = rs274ngc.word
 
@@ -69,46 +74,19 @@ class MachineState(rs274ngc.MachineState):
         self._pending_named_parameter_values[parameter_index] = parameter_value
 
 
-class Visitor(rs274ngc.Visitor):
-    machine_state: MachineState  # type: ignore[reportIncompatibleVariableOverride] Oh no my Liskov substitution principle!
+class LinuxCNC(rs274ngc.Rs274):
+    machine_state: MachineState  # type: ignore[reportIncompatibleVariableOverride]
+
+    @property
+    def grammar_str(self) -> str:
+        return GRAMMAR
 
     def __init__(
         self,
-        machine_state: MachineState,
-        defaults=True,
-        **kwargs,
+        initial_machine_state: MachineState | None = None,
+        start_rule: str = "line",
+        extra_rule: str | None = None,
     ):
-        super().__init__(machine_state, defaults, **kwargs)
-
-    def visit_named_parameter(self, node, children: list[str]):
-        parameter_name = children[0]
-        return self.machine_state.get_parameter_value(parameter_name)
-
-    def visit_named_parameter_setting(self, node, children: list[str | TNumber]):
-        parameter_name = children[0]
-        parameter_value = children[1]
-        assert isinstance(parameter_name, str)
-        assert isinstance(parameter_value, TNumber)
-
-        self.machine_state.set_parameter_value(parameter_name, parameter_value)
-
-    def visit_line(self, node, children: list[int | Word | str]) -> Line:
-        line = super().visit_line(node, children)
-
-        # Updated named parameters after the line has been processed
-        self.machine_state.commit_parameter_values()
-
-        return line
-
-
-class Parser(rs274ngc.Parser):
-    GRAMMAR_FILE = CURRENT_DIR / "linuxcnc.peg"
-    machine_state: MachineState  # type: ignore[reportIncompatibleVariableOverride]
-
-    def visitor(self) -> Visitor:
-        return Visitor(machine_state=self.machine_state)
-
-    def __init__(self, initial_machine_state: MachineState | None = None):
         """Create a new LinuxCNC GCode parser.
 
         The parser is stateful and keeps an internal machine state which gets updated as lines of gcode are parsed.
@@ -124,4 +102,47 @@ class Parser(rs274ngc.Parser):
             parser.parse('#123 = 1 G0 X#123') # X123 evaluates to X0
             parser.parse('#123 = 1 G0 X#123') # X123 evaluates to X123
         """
-        super().__init__(initial_machine_state)
+        super().__init__(initial_machine_state, start_rule=start_rule, extra_rule=extra_rule)
+
+    def transform_named_parameter(self, parameter_name: str):
+        return self.machine_state.get_parameter_value(parameter_name)
+
+    def transform_named_parameter_setting(self, items: list[str | TNumber]):
+        assert len(items) == 2
+        parameter_name = items[0]
+        parameter_value = items[1]
+        assert isinstance(parameter_name, str)
+        assert isinstance(parameter_value, TNumber)
+
+        self.machine_state.set_parameter_value(parameter_name, parameter_value)
+        return NamedParameterAssignment(name=parameter_name, value=parameter_value)
+
+    def transform_line(  # type: ignore[reportIncompatibleVariableOverride]
+        self,
+        s: str,
+        items: list[Literal["/"] | int | Word | str | NumericParameterAssignment | NamedParameterAssignment],
+    ) -> Line:
+        rs274_items: list[Literal["/"] | int | Word | str | NumericParameterAssignment] = []
+
+        named_parameter_assignments: dict[str, TNumber] = {}
+        for item in items:
+            if isinstance(item, NamedParameterAssignment):
+                named_parameter_assignments[item.name] = item.value
+            else:
+                rs274_items.append(item)
+
+        line = super().transform_line(s, rs274_items)
+        line.named_assignments = named_parameter_assignments
+
+        # Updated named parameters after the line has been processed
+        self.machine_state.commit_parameter_values()
+
+        return line
+
+    def actions(self):
+        rs274_actions = super().actions()
+        return {
+            "named_parameter": self.transform_named_parameter,
+            "named_parameter_setting": Pack(self.transform_named_parameter_setting),
+            **rs274_actions,
+        }

@@ -1,7 +1,7 @@
-from rs274_parser.dialects.linuxcnc import MachineState, Parser
+from rs274_parser.dialects.linuxcnc import LinuxCNC, MachineState
 
 initial_machine_state = MachineState(initial_named_parameter_values={"defined": 10, "param": 1})
-parser = Parser(initial_machine_state)
+parser = LinuxCNC(initial_machine_state)
 
 gcode = """\
 #<named_var> = 1

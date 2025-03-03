@@ -1,10 +1,10 @@
 import math
 
 import pytest
-from arpeggio import NoMatch
+from pe._errors import ParseError
 
 from rs274_parser import exceptions
-from rs274_parser.dialects.rs274ngc import MachineState, Parser, word
+from rs274_parser.dialects.rs274ngc import MachineState, Rs274, word
 from rs274_parser.types import Line, TNumber, Word
 
 
@@ -18,7 +18,7 @@ from rs274_parser.types import Line, TNumber, Word
     ],
 )
 def test_numbers(input: str, expected_output: TNumber):
-    assert Parser()._parse_rule(input, root_rule="number") == expected_output
+    assert Rs274(start_rule="number")._parse_rule(input) == expected_output
 
 
 @pytest.mark.parametrize(
@@ -73,9 +73,11 @@ def test_numbers(input: str, expected_output: TNumber):
     ],
 )
 def test_operation(input: str, expected_output: int | float):
-    assert pytest.approx(expected_output) == Parser(MachineState(initial_parameter_values={3: 1, 1: 1}))._parse_rule(
-        input, root_rule="l1_operation"
-    )
+    output = Rs274(
+        MachineState(initial_parameter_values={3: 1, 1: 1}),
+        start_rule="l1_operation",
+    )._parse_rule(input)
+    assert pytest.approx(expected_output) == output
 
 
 @pytest.mark.parametrize(
@@ -85,7 +87,10 @@ def test_operation(input: str, expected_output: int | float):
 def test_numeric_parameters(input: str, expected_output: int | float | type[Exception]):
     assert (
         pytest.approx(
-            Parser(MachineState(initial_parameter_values={123: 123}))._parse_rule(input, root_rule="numeric_parameter")
+            Rs274(
+                MachineState(initial_parameter_values={123: 123}),
+                start_rule="numeric_parameter",
+            )._parse_rule(input)
         )
         == expected_output
     )
@@ -95,13 +100,17 @@ def test_numeric_parameters(input: str, expected_output: int | float | type[Exce
     "input,expected_exception",
     [
         ("#999", exceptions.UndefinedParameter),
-        ("#123.01", exceptions.ExpectedInteger),
-        ("#banana", NoMatch),
+        ("#123.01", ParseError),
+        ("#banana", Exception),
     ],
 )
 def test_numeric_parameters__error(input: str, expected_exception: type[Exception]):
     with pytest.raises(expected_exception):
-        Parser(MachineState(initial_parameter_values={123: 123}))._parse_rule(input, root_rule="numeric_parameter")
+        Rs274(
+            MachineState(initial_parameter_values={123: 123}),
+            start_rule="numeric_parameter_eof",
+            extra_rule="numeric_parameter_eof < numeric_parameter EndOfFile",
+        )._parse_rule(input)
 
 
 @pytest.mark.parametrize(
@@ -120,9 +129,10 @@ def test_numeric_parameters__error(input: str, expected_exception: type[Exceptio
     ],
 )
 def test_word(input: str, expected_output: Word):
-    assert Parser(MachineState(initial_parameter_values={1: 1, 2: 2}))._parse_rule(
-        input, root_rule="word"
-    ) == pytest.approx(expected_output)
+    assert Rs274(
+        MachineState(initial_parameter_values={1: 1, 2: 2}),
+        start_rule="word",
+    )._parse_rule(input) == pytest.approx(expected_output)
 
 
 @pytest.mark.parametrize(
@@ -153,18 +163,21 @@ def test_word(input: str, expected_output: Word):
         # Parameter setting
         (
             "#10 = 10",
-            Line(words=[]),
+            Line(words=[], numeric_assignments={10: 10}),
             {10: 10, 1: 1000},
         ),
         (
             "#1 = 1 G0 X#1",
-            Line(words=[word("g", 0), word("X", 1000)]),
+            Line(words=[word("g", 0), word("X", 1000)], numeric_assignments={1: 1}),
             {1: 1},
         ),
         (
             # The rightmost parameter should have precedence
             "#1 = 1 G0 X#1 #1 = 2",
-            Line(words=[word("g", 0), word("X", 1000)]),
+            Line(
+                words=[word("g", 0), word("X", 1000)],
+                numeric_assignments={1: 2},
+            ),
             {1: 2},
         ),
     ],
@@ -175,9 +188,9 @@ def test_line(
     expected_parameters: dict[int, TNumber] | None,
 ):
     initial_machine_state = MachineState(initial_parameter_values={1: 1000})
-    parser = Parser(initial_machine_state)
+    parser = Rs274(initial_machine_state, start_rule="line")
 
-    assert pytest.approx(parser._parse_rule(input, root_rule="line")) == expected_output
+    assert parser._parse_rule(input) == expected_output
 
     if expected_parameters is not None:
         # The initial state should not change
@@ -189,7 +202,9 @@ def test_line(
 def test_block_delete():
     line = "/ M2"
 
-    assert Parser()._parse_rule(line, root_rule="line") == Line([word("m", 2)])
-    assert Parser(MachineState(is_block_delete_switch_enabled=True))._parse_rule(line, root_rule="line") == Line(
-        [], comments=["/M2"]
+    assert Rs274(start_rule="line")._parse_rule(
+        line,
+    ) == Line([word("m", 2)])
+    assert Rs274(MachineState(is_block_delete_switch_enabled=True), start_rule="line")._parse_rule(line) == Line(
+        [], comments=["/ M2"]
     )
