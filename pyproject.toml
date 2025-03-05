@@ -1,24 +1,22 @@
-[project]
+[tool.poetry]
 name = "rs274-parser"
-version = "0.1.5"
+version = "0.2.0"
 description = ""
-authors = [
-    {name = "Robert Kirberich",email = "robert@kirberich.de"}
-]
+authors = ["Robert Kirberich <robert@kirberich.de>"]
 readme = "README.md"
-requires-python = ">=3.12"
-dependencies = [
-    "pe (>=0.5.3,<0.6.0)",
-]
 
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+[tool.poetry.dependencies]
+python = "^3.11"
+pe = "^0.5.3"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.3.4"
+pytest = "^8.3.5"
+ruff = "^0.9.9"
 pytest-coverage = "^0.0"
-ruff = "^0.9.6"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.pyright]
 reportMatchNotExhaustive = true

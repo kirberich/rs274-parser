@@ -1,8 +1,5 @@
-import datetime
 import math
-import re
 from copy import deepcopy
-from itertools import batched
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence, cast
 
@@ -12,12 +9,18 @@ from pe._grammar import Grammar
 from pe._parse import loads
 from pe.actions import Action, Capture, Pack
 from pe.machine import MachineParser
-from pe.packrat import PackratParser
 from pe.patterns import DEFAULT_IGNORE
 
-from rs274_parser import exceptions, types
+from rs274_parser import exceptions
 from rs274_parser.math_utils import to_deg, to_rad
-from rs274_parser.types import BINARY_OPERATOR, UNARY_OPERATOR, Line, NumericParameterAssignment, TNumber, Word
+from rs274_parser.types import (
+    BINARY_OPERATOR,
+    UNARY_OPERATOR,
+    Line,
+    NumericParameterAssignment,
+    TNumber,
+    Word,
+)
 
 from .constants import LETTERS, UNARY_OPERATORS, WORDS
 from .rs274ngc_grammar import GRAMMAR
@@ -26,6 +29,12 @@ CURRENT_DIR = Path(__file__).parent
 
 
 # FIXME: missing two-parameter atan
+
+
+def batched(iterable, n=1):
+    length = len(iterable)
+    for ndx in range(0, length, n):
+        yield iterable[ndx : min(ndx + n, length)]
 
 
 def word(letter: str, number: TNumber) -> Word:
@@ -220,7 +229,11 @@ class Rs274:
 
         return word(letter, number)
 
-    def transform_line(self, s: str, items: list[Literal["/"] | int | Word | str | NumericParameterAssignment]) -> Line:
+    def transform_line(
+        self,
+        s: str,
+        items: list[Literal["/"] | int | Word | str | NumericParameterAssignment],
+    ) -> Line:
         if len(items) > 0 and items[0] == "/":
             if self.machine_state.is_block_delete_switch_enabled:
                 return Line([], comments=[s])
